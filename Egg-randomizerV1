@@ -1,3 +1,4 @@
+--// Services
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local UserInputService = game:GetService("UserInputService")
@@ -140,4 +141,138 @@ end
 
 local function createLabel(egg, petName)
 	local billboard = Instance.new("BillboardGui")
-	billbo
+	billboard.Name = "PetDetectorBillboard"
+	billboard.Size = UDim2.new(0, 220, 0, 40)
+	billboard.Adornee = egg.PrimaryPart or egg:FindFirstChildWhichIsA("BasePart")
+	billboard.AlwaysOnTop = true
+	billboard.StudsOffset = Vector3.new(0, 3.5, 0)
+	billboard.Parent = egg
+
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.Text = "Inside: " .. petName
+	label.TextColor3 = Color3.fromRGB(255, 255, 0)
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = 20
+	label.Parent = billboard
+
+	table.insert(eggLabels, billboard)
+end
+
+local function getRandomPet(eggName)
+	local pets = EggData[eggName]
+	return pets and pets[math.random(1, #pets)] or nil
+end
+
+local function assignRandomPet(egg)
+	local pet = getRandomPet(egg.Name)
+	if pet then
+		egg:SetAttribute("RerolledPet", pet)
+	end
+end
+
+local function createESPAndLabel(egg)
+	local pet = egg:GetAttribute("RerolledPet")
+	if not pet then return end
+	local color = PetColors[pet] or Color3.fromRGB(255, 255, 0)
+	createESP(egg, color)
+	createLabel(egg, pet)
+end
+
+function update()
+	clearAll()
+	for _, obj in ipairs(Workspace:GetDescendants()) do
+		if obj:IsA("Model") and EggData[obj.Name] then
+			if not obj:GetAttribute("RerolledPet") then
+				assignRandomPet(obj)
+			end
+			if visible then
+				createESPAndLabel(obj)
+			end
+		end
+	end
+end
+
+function rerollPets()
+	clearAll()
+	for _, obj in ipairs(Workspace:GetDescendants()) do
+		if obj:IsA("Model") and EggData[obj.Name] then
+			assignRandomPet(obj)
+			if visible then
+				createESPAndLabel(obj)
+			end
+		end
+	end
+end
+
+--// UI Buttons
+local rerollGui = Instance.new("ScreenGui")
+rerollGui.Name = "RerollUI"
+rerollGui.ResetOnSpawn = false
+rerollGui.Parent = playerGui
+
+local rerollBtn = Instance.new("TextButton")
+rerollBtn.Size = UDim2.new(0, 140, 0, 40)
+rerollBtn.Position = UDim2.new(0, 20, 1, -60)
+rerollBtn.AnchorPoint = Vector2.new(0, 1)
+rerollBtn.BackgroundColor3 = Color3.fromRGB(30, 120, 40)
+rerollBtn.Text = "🔄 Reroll"
+rerollBtn.Font = Enum.Font.GothamBold
+rerollBtn.TextSize = 20
+rerollBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+rerollBtn.Parent = rerollGui
+Instance.new("UICorner", rerollBtn).CornerRadius = UDim.new(0.2, 0)
+
+local autoToggle = Instance.new("TextButton")
+autoToggle.Size = UDim2.new(0, 160, 0, 40)
+autoToggle.Position = UDim2.new(0, 180, 1, -60)
+autoToggle.AnchorPoint = Vector2.new(0, 1)
+autoToggle.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+autoToggle.Text = "⏱️ Auto Reroll: OFF"
+autoToggle.Font = Enum.Font.Gotham
+autoToggle.TextSize = 18
+autoToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+autoToggle.Parent = rerollGui
+Instance.new("UICorner", autoToggle).CornerRadius = UDim.new(0.2, 0)
+
+-- Manual Reroll
+rerollBtn.MouseButton1Click:Connect(function()
+	rerollPets()
+end)
+
+-- Auto Reroll Loop
+local autoReroll = false
+autoToggle.MouseButton1Click:Connect(function()
+	autoReroll = not autoReroll
+	autoToggle.Text = autoReroll and "⏱️ Auto Reroll: ON" or "⏱️ Auto Reroll: OFF"
+	autoToggle.BackgroundColor3 = autoReroll and Color3.fromRGB(30, 120, 40) or Color3.fromRGB(100, 100, 100)
+end)
+
+task.spawn(function()
+	while true do
+		if autoReroll then
+			rerollPets()
+		end
+		wait(5)
+	end
+end)
+
+-- H Key to toggle ESP
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.H then
+		if cooldown then return end
+		cooldown = true
+		visible = not visible
+		if visible then
+			update()
+		else
+			clearAll()
+		end
+		task.delay(0.3, function() cooldown = false end)
+	end
+end)
+
+-- Initial Run
+update()
